@@ -10,6 +10,8 @@
   --brass-dim:  #8a7038;   /* laiton assombri */
   --claret:     #8a1f2d;   /* rouge bordeaux — accent secondaire */
   --claret-glow:#e0435a;
+  --worn:       #4f7a5c;   /* vert sourd — "porté" par le soumis */
+  --worn-glow:  #6fae82;
   --ivory:      #ece1d3;   /* texte principal */
   --ivory-dim:  #b6a89c;   /* texte secondaire */
   --line:       rgba(201,162,78,0.18);
@@ -215,13 +217,30 @@ button{ font-family: var(--sans); cursor:pointer; }
   background: linear-gradient(135deg, rgba(138,31,45,0.35), rgba(201,162,78,0.08));
   box-shadow: 0 0 0 1px var(--claret), 0 0 18px rgba(224,67,90,0.25);
 }
-.item-name{ font-size:14px; color: var(--ivory); padding-right:20px; }
+.item-name{ font-size:14px; color: var(--ivory); padding-right:20px; padding-left:16px; }
 .item.selected .item-name{ color:#fff; }
 .item-mark{
   position:absolute; top:10px; right:12px; font-size:13px; color: var(--claret-glow);
   opacity:0; transition: opacity .15s ease;
 }
 .item.selected .item-mark{ opacity:1; }
+
+.item.worn{
+  border-color: var(--worn);
+  box-shadow: 0 0 0 1px var(--worn), 0 0 18px rgba(111,174,130,0.25);
+  background: linear-gradient(135deg, rgba(79,122,92,0.28), rgba(201,162,78,0.06));
+}
+.item.worn .item-name{ color:#fff; }
+.item-mark-worn{
+  position:absolute; top:10px; left:12px; font-size:12px; color: var(--worn-glow);
+  opacity:0; transition: opacity .15s ease;
+}
+.item.worn .item-mark-worn{ opacity:1; }
+
+.item.selected.worn{
+  border-color: var(--brass);
+  box-shadow: 0 0 0 1px var(--claret), 0 0 0 3px var(--worn), 0 0 20px rgba(111,174,130,0.2);
+}
 .item-remove{
   all:unset; position:absolute; bottom:8px; right:10px; font-size:11px;
   color: var(--ivory-dim); opacity:0; transition: opacity .15s ease;
@@ -263,6 +282,7 @@ button{ font-family: var(--sans); cursor:pointer; }
   font-size:10px; letter-spacing:.12em; text-transform:uppercase;
   padding:3px 9px; border-radius:20px; border:1px solid var(--line); color: var(--brass);
 }
+.tag.status-pool{ color: var(--ivory-dim); border-style: dashed; }
 .tag.status-pending{ color: var(--ivory-dim); }
 .tag.status-progress{ color: var(--brass); border-color: rgba(201,162,78,0.4); }
 .tag.status-done{ color: var(--claret-glow); border-color: rgba(224,67,90,0.4); }
@@ -375,4 +395,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 @media (prefers-reduced-motion: reduce){
   *{ animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
 }
