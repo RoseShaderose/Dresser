@@ -10,35 +10,35 @@ const SEED = {
     {
       id: uid(), name: "Colliers & liens",
       items: [
-        { id: uid(), name: "Collier de cuir noir", selected: false },
-        { id: uid(), name: "Ruban de soie rouge", selected: false }
+        { id: uid(), name: "Collier de cuir noir", selected: false, worn: false },
+        { id: uid(), name: "Ruban de soie rouge", selected: false, worn: false }
       ]
     },
     {
       id: uid(), name: "Bâillons",
       items: [
-        { id: uid(), name: "Bâillon boule", selected: false }
+        { id: uid(), name: "Bâillon boule", selected: false, worn: false }
       ]
     },
     {
       id: uid(), name: "Menottes & entraves",
       items: [
-        { id: uid(), name: "Menottes métal", selected: false },
-        { id: uid(), name: "Entraves chevilles", selected: false }
+        { id: uid(), name: "Menottes métal", selected: false, worn: false },
+        { id: uid(), name: "Entraves chevilles", selected: false, worn: false }
       ]
     },
     {
       id: uid(), name: "Tenues",
       items: [
-        { id: uid(), name: "Tenue noire complète", selected: false }
+        { id: uid(), name: "Tenue noire complète", selected: false, worn: false }
       ]
     }
   ],
   tasks: [
-    { id: uid(), type: "Service", description: "Masser Madame pendant 15 minutes", status: "pending" },
-    { id: uid(), type: "Ménage", description: "Ranger et nettoyer la chambre", status: "pending" },
-    { id: uid(), type: "Discipline", description: "Tenir la position d'attente 10 minutes", status: "pending" },
-    { id: uid(), type: "Écriture", description: "Écrire une lettre de gratitude à Madame", status: "pending" }
+    { id: uid(), type: "Service", description: "Masser Madame pendant 15 minutes", status: "pool" },
+    { id: uid(), type: "Ménage", description: "Ranger et nettoyer la chambre", status: "pool" },
+    { id: uid(), type: "Discipline", description: "Tenir la position d'attente 10 minutes", status: "pool" },
+    { id: uid(), type: "Écriture", description: "Écrire une lettre de gratitude à Madame", status: "pool" }
   ],
   punishments: [
     { id: uid(), title: "Temps d'agenouillement", description: "10 minutes supplémentaires, en silence.", severity: "légère" },
@@ -164,8 +164,9 @@ function renderWardrobe(){
       </div>
       <div class="items-grid">
         ${cat.items.map(it => `
-          <div class="item ${it.selected ? "selected" : ""}" data-action="toggle-item" data-cat="${cat.id}" data-item="${it.id}">
+          <div class="item ${it.selected ? "selected" : ""} ${it.worn ? "worn" : ""}" data-action="toggle-item" data-cat="${cat.id}" data-item="${it.id}">
             <span class="item-mark">&#9829;</span>
+            <span class="item-mark-worn">&#10003;</span>
             <span class="item-name">${escapeHtml(it.name)}</span>
             <button class="item-remove" data-action="del-item" data-cat="${cat.id}" data-item="${it.id}">supprimer</button>
           </div>
@@ -184,9 +185,16 @@ document.getElementById("categoriesList").addEventListener("click", e=>{
 
   if(action === "toggle-item"){
     const item = cat.items.find(i => i.id === t.dataset.item);
-    item.selected = !item.selected;
+    if(isDominante()){
+      item.selected = !item.selected;
+      if(item.selected) log(`Madame a choisi : ${cat.name} — ${item.name}`);
+      else log(`Madame a retiré son choix : ${cat.name} — ${item.name}`);
+    }else{
+      item.worn = !item.worn;
+      if(item.worn) log(`Le soumis porte : ${cat.name} — ${item.name}`);
+      else log(`Le soumis ne porte plus : ${cat.name} — ${item.name}`);
+    }
     save();
-    if(item.selected) log(`Madame a choisi : ${cat.name} — ${item.name}`);
     renderWardrobe(); renderJournal();
   }
   if(action === "del-item"){
@@ -207,7 +215,7 @@ document.getElementById("categoriesList").addEventListener("click", e=>{
       m.querySelector("#f-save").onclick = ()=>{
         const name = m.querySelector("#f-name").value.trim();
         if(!name) return;
-        cat.items.push({ id: uid(), name, selected:false });
+        cat.items.push({ id: uid(), name, selected:false, worn:false });
         save(); renderWardrobe(); closeModal();
       };
     });
@@ -260,7 +268,7 @@ document.getElementById("addCategoryBtn").addEventListener("click", ()=>{
    RENDER — TÂCHES
    ========================================================= */
 let taskFilter = "all";
-const STATUS_LABEL = { pending:"À faire", progress:"En cours", done:"Accomplie" };
+const STATUS_LABEL = { pool:"Liste", pending:"À faire", progress:"En cours", done:"Accomplie" };
 
 function renderTasks(){
   const el = document.getElementById("tasksList");
@@ -280,6 +288,7 @@ function renderTasks(){
       </div>
       <div class="card-side">
         <select class="status-select" data-action="set-status" data-id="${t.id}">
+          <option value="pool" ${t.status==="pool"?"selected":""}>Liste</option>
           <option value="pending" ${t.status==="pending"?"selected":""}>À faire</option>
           <option value="progress" ${t.status==="progress"?"selected":""}>En cours</option>
           <option value="done" ${t.status==="done"?"selected":""}>Accomplie</option>
@@ -322,7 +331,7 @@ function taskModal(task){
         task.type = type; task.description = description;
         log(`Tâche modifiée : ${description}`);
       }else{
-        state.tasks.unshift({ id: uid(), type, description, status:"pending" });
+        state.tasks.unshift({ id: uid(), type, description, status:"pool" });
         log(`Nouvelle tâche assignée : ${description}`);
       }
       save(); renderTasksWithPoints(); renderJournal(); closeModal();
