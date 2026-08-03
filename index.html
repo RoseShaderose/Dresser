@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Protocole — Notre Dresser</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,500&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -13,7 +13,7 @@
 <div class="app">
 
   <!-- SIDEBAR -->
-  <aside class="sidebar">
+  <aside class="sidebar" id="sidebar">
     <div class="crest">
       <div class="crest-ring"><span>&#9829;</span></div>
       <h1>Protocole</h1>
@@ -41,8 +41,8 @@
     <div class="role-switch">
       <span class="role-label">Vue active</span>
       <div class="role-toggle" id="roleToggle">
-        <button class="role-btn active" data-role="maitresse">Madame</button>
-        <button class="role-btn" data-role="soumis">Soumis</button>
+        <button class="role-btn" data-role="maitresse">Madame</button>
+        <button class="role-btn active" data-role="soumis">Soumis</button>
       </div>
     </div>
 
@@ -57,6 +57,13 @@
     <p class="sync-status" id="syncStatus">Non connecté</p>
   </aside>
 
+  <!-- MOBILE TOP BAR -->
+  <header class="mobile-bar">
+    <button class="menu-toggle" id="menuToggle" aria-label="Menu">☰</button>
+    <span class="mobile-title">Protocole</span>
+    <button class="sync-btn mobile-sync" id="syncBtnMobile">&#8635;</button>
+  </header>
+
   <!-- MAIN -->
   <main class="main">
 
@@ -68,7 +75,7 @@
           <h2>Garde-robe</h2>
           <p class="view-desc">En vue Madame : cliquer sur un objet le sélectionne pour le soumis (surbrillance rouge). En vue Soumis : cliquer sur un objet indique qu'il est actuellement porté (surbrillance verte).</p>
         </div>
-        <button class="btn-gold" id="addCategoryBtn">+ Catégorie</button>
+        <button class="btn-gold madame-only" id="addCategoryBtn">+ Catégorie</button>
       </header>
       <div class="categories" id="categoriesList"></div>
     </section>
@@ -79,9 +86,9 @@
         <div>
           <p class="eyebrow">II — Le service</p>
           <h2>Tâches</h2>
-          <p class="view-desc">Toute nouvelle tâche arrive dans la Liste. Madame choisit celles à assigner (À faire) ; le soumis les fait avancer jusqu'à Accomplie.</p>
+          <p class="view-desc">Toute nouvelle tâche arrive dans la Liste. Madame choisit celles à assigner (À faire) ; le soumis les fait avancer jusqu'à Accomplie ou Échec.</p>
         </div>
-        <button class="btn-gold" id="addTaskBtn">+ Tâche</button>
+        <button class="btn-gold madame-only" id="addTaskBtn">+ Tâche</button>
       </header>
       <div class="filters" id="taskFilters">
         <button class="filter-chip active" data-filter="all">Toutes</button>
@@ -89,6 +96,7 @@
         <button class="filter-chip" data-filter="pending">À faire</button>
         <button class="filter-chip" data-filter="progress">En cours</button>
         <button class="filter-chip" data-filter="done">Accomplies</button>
+        <button class="filter-chip" data-filter="failed">Échec</button>
       </div>
       <div class="card-list" id="tasksList"></div>
     </section>
@@ -99,9 +107,9 @@
         <div>
           <p class="eyebrow">III — La discipline</p>
           <h2>Punitions</h2>
-          <p class="view-desc">À utiliser en cas de manquement. Madame peut assigner directement une punition depuis la liste.</p>
+          <p class="view-desc">À utiliser en cas de manquement. Seule Madame peut assigner une punition.</p>
         </div>
-        <button class="btn-gold" id="addPunishmentBtn">+ Punition</button>
+        <button class="btn-gold madame-only" id="addPunishmentBtn">+ Punition</button>
       </header>
       <div class="card-list" id="punishmentsList"></div>
     </section>
@@ -114,7 +122,7 @@
           <h2>Boutique</h2>
           <p class="view-desc">Le soumis échange ses points d'obéissance contre une récompense.</p>
         </div>
-        <button class="btn-gold" id="addRewardBtn">+ Récompense</button>
+        <button class="btn-gold madame-only" id="addRewardBtn">+ Récompense</button>
       </header>
       <div class="card-list grid" id="shopList"></div>
     </section>
@@ -127,13 +135,16 @@
           <h2>Journal</h2>
           <p class="view-desc">Historique des points, tâches, punitions et achats.</p>
         </div>
-        <button class="btn-ghost" id="clearJournalBtn">Vider le journal</button>
+        <button class="btn-ghost madame-only" id="clearJournalBtn">Vider le journal</button>
       </header>
       <ul class="journal-list" id="journalList"></ul>
     </section>
 
   </main>
 </div>
+
+<!-- OVERLAY for mobile menu -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
 
 <!-- MODAL -->
 <div class="modal-overlay" id="modalOverlay">
