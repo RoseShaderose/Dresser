@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Protocole — Cabinet Privé</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,500&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="crest">
+      <div class="crest-ring"><span>&#9829;</span></div>
+      <h1>Protocole</h1>
+      <p class="crest-sub">Cabinet privé</p>
+    </div>
+
+    <nav class="nav">
+      <button class="nav-item active" data-view="wardrobe">
+        <span class="nav-num">I</span> Garde-robe
+      </button>
+      <button class="nav-item" data-view="tasks">
+        <span class="nav-num">II</span> Tâches
+      </button>
+      <button class="nav-item" data-view="punishments">
+        <span class="nav-num">III</span> Punitions
+      </button>
+      <button class="nav-item" data-view="shop">
+        <span class="nav-num">IV</span> Boutique
+      </button>
+      <button class="nav-item" data-view="journal">
+        <span class="nav-num">V</span> Journal
+      </button>
+    </nav>
+
+    <div class="role-switch">
+      <span class="role-label">Vue active</span>
+      <div class="role-toggle" id="roleToggle">
+        <button class="role-btn active" data-role="maitresse">Madame</button>
+        <button class="role-btn" data-role="soumis">Soumis</button>
+      </div>
+    </div>
+
+    <div class="points-badge">
+      <div class="medallion" id="pointsMedallion">
+        <span id="pointsValue">0</span>
+      </div>
+      <span class="points-label">points d'obéissance</span>
+    </div>
+
+    <button class="sync-btn" id="syncBtn">&#8635; Synchronisation</button>
+    <p class="sync-status" id="syncStatus">Non connecté</p>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- VUE I — GARDE-ROBE -->
+    <section class="view active" id="view-wardrobe">
+      <header class="view-header">
+        <div>
+          <p class="eyebrow">I — L'inventaire</p>
+          <h2>Garde-robe</h2>
+          <p class="view-desc">Madame sélectionne ce que le soumis portera. Les objets en surbrillance sont son choix du moment.</p>
+        </div>
+        <button class="btn-gold" id="addCategoryBtn">+ Catégorie</button>
+      </header>
+      <div class="categories" id="categoriesList"></div>
+    </section>
+
+    <!-- VUE II — TÂCHES -->
+    <section class="view" id="view-tasks">
+      <header class="view-header">
+        <div>
+          <p class="eyebrow">II — Le service</p>
+          <h2>Tâches</h2>
+          <p class="view-desc">Ce qui est assigné doit être accompli. Chaque tâche terminée peut être récompensée.</p>
+        </div>
+        <button class="btn-gold" id="addTaskBtn">+ Tâche</button>
+      </header>
+      <div class="filters" id="taskFilters">
+        <button class="filter-chip active" data-filter="all">Toutes</button>
+        <button class="filter-chip" data-filter="pending">À faire</button>
+        <button class="filter-chip" data-filter="progress">En cours</button>
+        <button class="filter-chip" data-filter="done">Accomplies</button>
+      </div>
+      <div class="card-list" id="tasksList"></div>
+    </section>
+
+    <!-- VUE III — PUNITIONS -->
+    <section class="view" id="view-punishments">
+      <header class="view-header">
+        <div>
+          <p class="eyebrow">III — La discipline</p>
+          <h2>Punitions</h2>
+          <p class="view-desc">À utiliser en cas de manquement. Madame peut assigner directement une punition depuis la liste.</p>
+        </div>
+        <button class="btn-gold" id="addPunishmentBtn">+ Punition</button>
+      </header>
+      <div class="card-list" id="punishmentsList"></div>
+    </section>
+
+    <!-- VUE IV — BOUTIQUE -->
+    <section class="view" id="view-shop">
+      <header class="view-header">
+        <div>
+          <p class="eyebrow">IV — La récompense</p>
+          <h2>Boutique</h2>
+          <p class="view-desc">Le soumis échange ses points d'obéissance contre une récompense.</p>
+        </div>
+        <button class="btn-gold" id="addRewardBtn">+ Récompense</button>
+      </header>
+      <div class="card-list grid" id="shopList"></div>
+    </section>
+
+    <!-- VUE V — JOURNAL -->
+    <section class="view" id="view-journal">
+      <header class="view-header">
+        <div>
+          <p class="eyebrow">V — La mémoire</p>
+          <h2>Journal</h2>
+          <p class="view-desc">Historique des points, tâches, punitions et achats.</p>
+        </div>
+        <button class="btn-ghost" id="clearJournalBtn">Vider le journal</button>
+      </header>
+      <ul class="journal-list" id="journalList"></ul>
+    </section>
+
+  </main>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" id="modal"></div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/sync.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
