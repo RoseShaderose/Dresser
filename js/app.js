@@ -5,7 +5,8 @@ const STORAGE_KEY = "protocole_data_v1";
 
 const SEED = {
   points: 0,
-  role: "maitresse",
+  role: "soumis",
+  madamePasswordHash: null, // null = pas encore défini
   categories: [
     {
       id: uid(), name: "Colliers & liens",
@@ -83,6 +84,21 @@ function log(text){
 }
 
 /* =========================================================
+   MOT DE PASSE MADAME (hash simple, côté client)
+   ========================================================= */
+async function hashPassword(pwd){
+  const enc = new TextEncoder().encode(pwd + "protocole_salt_v1");
+  const buf = await crypto.subtle.digest("SHA-256", enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
+}
+
+async function verifyPassword(pwd){
+  if(!state.madamePasswordHash) return true; // pas encore défini
+  const h = await hashPassword(pwd);
+  return h === state.madamePasswordHash;
+}
+
+/* =========================================================
    UTIL
    ========================================================= */
 function escapeHtml(str){
@@ -103,6 +119,12 @@ function showToast(msg){
   showToast._tm = setTimeout(() => t.classList.remove("show"), 2200);
 }
 function isDominante(){ return state.role === "maitresse"; }
+function isSoumis(){ return state.role === "soumis"; }
+
+function applyRoleClass(){
+  document.body.classList.toggle("role-soumis", isSoumis());
+  document.body.classList.toggle("role-maitresse", isDominante());
+}
 
 /* =========================================================
    NAVIGATION
@@ -113,15 +135,105 @@ document.querySelectorAll(".nav-item").forEach(btn=>{
     document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
     btn.classList.add("active");
     document.getElementById("view-"+btn.dataset.view).classList.add("active");
+    // close mobile menu
+    document.getElementById("sidebar").classList.remove("open");
+    document.getElementById("sidebarOverlay").classList.remove("open");
   });
 });
 
+/* Mobile menu */
+const menuToggle = document.getElementById("menuToggle");
+const sidebar = document.getElementById("sidebar");
+const sidebarOverlay = document.getElementById("sidebarOverlay");
+if(menuToggle){
+  menuToggle.addEventListener("click", ()=>{
+    sidebar.classList.toggle("open");
+    sidebarOverlay.classList.toggle("open");
+  });
+}
+if(sidebarOverlay){
+  sidebarOverlay.addEventListener("click", ()=>{
+    sidebar.classList.remove("open");
+    sidebarOverlay.classList.remove("open");
+  });
+}
+
+/* Role switch with password protection */
 document.querySelectorAll(".role-btn").forEach(btn=>{
-  btn.addEventListener("click", ()=>{
-    state.role = btn.dataset.role;
+  btn.addEventListener("click", async ()=>{
+    const targetRole = btn.dataset.role;
+    if(targetRole === state.role) return;
+
+    if(targetRole === "maitresse"){
+      // besoin du mot de passe
+      if(!state.madamePasswordHash){
+        // première fois : définir le mot de passe
+        openModal(`
+          <h3>Définir le mot de passe Madame</h3>
+          <p style="color:var(--ivory-dim);font-size:13px;margin-bottom:14px;line-height:1.5;">
+            Choisissez un mot de passe que seul Madame connaîtra. Le soumis ne pourra pas accéder à ce mode.
+          </p>
+          <div class="field"><label>Nouveau mot de passe</label><input id="f-pwd" type="password" autofocus></div>
+          <div class="field"><label>Confirmer</label><input id="f-pwd2" type="password"></div>
+          <div class="modal-actions">
+            <button class="btn-mini" id="f-cancel">Annuler</button>
+            <button class="btn-mini gold" id="f-save">Définir</button>
+          </div>
+        `, m=>{
+          m.querySelector("#f-cancel").onclick = closeModal;
+          m.querySelector("#f-save").onclick = async ()=>{
+            const p1 = m.querySelector("#f-pwd").value;
+            const p2 = m.querySelector("#f-pwd2").value;
+            if(!p1 || p1.length < 4){ showToast("Minimum 4 caractères"); return; }
+            if(p1 !== p2){ showToast("Les mots de passe ne correspondent pas"); return; }
+            state.madamePasswordHash = await hashPassword(p1);
+            state.role = "maitresse";
+            save();
+            document.querySelectorAll(".role-btn").forEach(b=>b.classList.remove("active"));
+            btn.classList.add("active");
+            applyRoleClass();
+            renderAll();
+            closeModal();
+            showToast("Mot de passe Madame défini");
+          };
+        });
+        return;
+      }
+
+      // demander le mot de passe
+      openModal(`
+        <h3>Accès Madame</h3>
+        <p style="color:var(--ivory-dim);font-size:13px;margin-bottom:14px;">Entrez le mot de passe de Madame.</p>
+        <div class="field"><label>Mot de passe</label><input id="f-pwd" type="password" autofocus></div>
+        <div class="modal-actions">
+          <button class="btn-mini" id="f-cancel">Annuler</button>
+          <button class="btn-mini gold" id="f-ok">Entrer</button>
+        </div>
+      `, m=>{
+        m.querySelector("#f-cancel").onclick = closeModal;
+        const tryEnter = async ()=>{
+          const ok = await verifyPassword(m.querySelector("#f-pwd").value);
+          if(!ok){ showToast("Mot de passe incorrect"); return; }
+          state.role = "maitresse";
+          save();
+          document.querySelectorAll(".role-btn").forEach(b=>b.classList.remove("active"));
+          btn.classList.add("active");
+          applyRoleClass();
+          renderAll();
+          closeModal();
+        };
+        m.querySelector("#f-ok").onclick = tryEnter;
+        m.querySelector("#f-pwd").addEventListener("keydown", e=>{ if(e.key==="Enter") tryEnter(); });
+      });
+      return;
+    }
+
+    // passage en soumis : libre
+    state.role = "soumis";
     save();
     document.querySelectorAll(".role-btn").forEach(b=>b.classList.remove("active"));
     btn.classList.add("active");
+    applyRoleClass();
     renderAll();
   });
 });
@@ -157,9 +269,9 @@ function renderWardrobe(){
     <div class="category" data-cat="${cat.id}">
       <div class="category-head">
         <h3>${escapeHtml(cat.name)}</h3>
-        <div class="category-actions">
-          <button class="icon-btn" data-action="edit-cat" data-cat="${cat.id}" title="Renommer">✎</button>
-          <button class="icon-btn danger" data-action="del-cat" data-cat="${cat.id}" title="Supprimer">✕</button>
+        <div class="category-actions madame-only">
+          <button class="icon-btn edit-only" data-action="edit-cat" data-cat="${cat.id}" title="Renommer">✎</button>
+          <button class="icon-btn danger delete-only" data-action="del-cat" data-cat="${cat.id}" title="Supprimer">✕</button>
         </div>
       </div>
       <div class="items-grid">
@@ -168,7 +280,7 @@ function renderWardrobe(){
             <span class="item-mark">&#9829;</span>
             <span class="item-mark-worn">&#10003;</span>
             <span class="item-name">${escapeHtml(it.name)}</span>
-            <button class="item-remove" data-action="del-item" data-cat="${cat.id}" data-item="${it.id}">supprimer</button>
+            <button class="item-remove delete-only madame-only" data-action="del-item" data-cat="${cat.id}" data-item="${it.id}">supprimer</button>
           </div>
         `).join("")}
         <button class="add-item-btn" data-action="add-item" data-cat="${cat.id}">+ Ajouter un objet</button>
@@ -182,14 +294,17 @@ document.getElementById("categoriesList").addEventListener("click", e=>{
   if(!t) return;
   const action = t.dataset.action;
   const cat = state.categories.find(c => c.id === t.dataset.cat);
+  if(!cat) return;
 
   if(action === "toggle-item"){
     const item = cat.items.find(i => i.id === t.dataset.item);
+    if(!item) return;
     if(isDominante()){
       item.selected = !item.selected;
       if(item.selected) log(`Madame a choisi : ${cat.name} — ${item.name}`);
       else log(`Madame a retiré son choix : ${cat.name} — ${item.name}`);
     }else{
+      // soumis : uniquement le statut "porté"
       item.worn = !item.worn;
       if(item.worn) log(`Le soumis porte : ${cat.name} — ${item.name}`);
       else log(`Le soumis ne porte plus : ${cat.name} — ${item.name}`);
@@ -198,11 +313,13 @@ document.getElementById("categoriesList").addEventListener("click", e=>{
     renderWardrobe(); renderJournal();
   }
   if(action === "del-item"){
+    if(!isDominante()) return;
     e.stopPropagation();
     cat.items = cat.items.filter(i => i.id !== t.dataset.item);
     save(); renderWardrobe();
   }
   if(action === "add-item"){
+    // Soumis ET Madame peuvent ajouter
     openModal(`
       <h3>Nouvel objet</h3>
       <div class="field"><label>Nom de l'objet</label><input id="f-name" placeholder="Ex. Collier de cuir noir" autofocus></div>
@@ -216,11 +333,13 @@ document.getElementById("categoriesList").addEventListener("click", e=>{
         const name = m.querySelector("#f-name").value.trim();
         if(!name) return;
         cat.items.push({ id: uid(), name, selected:false, worn:false });
-        save(); renderWardrobe(); closeModal();
+        log(`Objet ajouté : ${cat.name} — ${name}`);
+        save(); renderWardrobe(); renderJournal(); closeModal();
       };
     });
   }
   if(action === "edit-cat"){
+    if(!isDominante()) return;
     openModal(`
       <h3>Renommer la catégorie</h3>
       <div class="field"><label>Nom</label><input id="f-name" value="${escapeHtml(cat.name)}" autofocus></div>
@@ -238,6 +357,7 @@ document.getElementById("categoriesList").addEventListener("click", e=>{
     });
   }
   if(action === "del-cat"){
+    if(!isDominante()) return;
     if(confirm(`Supprimer la catégorie « ${cat.name} » et tous ses objets ?`)){
       state.categories = state.categories.filter(c => c.id !== cat.id);
       save(); renderWardrobe();
@@ -246,6 +366,7 @@ document.getElementById("categoriesList").addEventListener("click", e=>{
 });
 
 document.getElementById("addCategoryBtn").addEventListener("click", ()=>{
+  // visible seulement pour Madame via CSS, mais on autorise aussi le soumis si le bouton est forcé
   openModal(`
     <h3>Nouvelle catégorie</h3>
     <div class="field"><label>Nom de la catégorie</label><input id="f-name" placeholder="Ex. Accessoires" autofocus></div>
@@ -259,7 +380,8 @@ document.getElementById("addCategoryBtn").addEventListener("click", ()=>{
       const name = m.querySelector("#f-name").value.trim();
       if(!name) return;
       state.categories.push({ id: uid(), name, items: [] });
-      save(); renderWardrobe(); closeModal();
+      log(`Catégorie ajoutée : ${name}`);
+      save(); renderWardrobe(); renderJournal(); closeModal();
     };
   });
 });
@@ -268,7 +390,13 @@ document.getElementById("addCategoryBtn").addEventListener("click", ()=>{
    RENDER — TÂCHES
    ========================================================= */
 let taskFilter = "all";
-const STATUS_LABEL = { pool:"Liste", pending:"À faire", progress:"En cours", done:"Accomplie" };
+const STATUS_LABEL = {
+  pool:"Liste",
+  pending:"À faire",
+  progress:"En cours",
+  done:"Accomplie",
+  failed:"Échec"
+};
 
 function renderTasks(){
   const el = document.getElementById("tasksList");
@@ -277,7 +405,41 @@ function renderTasks(){
     el.innerHTML = `<p class="empty-hint">Aucune tâche ici.</p>`;
     return;
   }
-  el.innerHTML = list.map(t => `
+  el.innerHTML = list.map(t => {
+    // Options de statut selon le rôle
+    let options = "";
+    if(isDominante()){
+      options = `
+        <option value="pool" ${t.status==="pool"?"selected":""}>Liste</option>
+        <option value="pending" ${t.status==="pending"?"selected":""}>À faire</option>
+        <option value="progress" ${t.status==="progress"?"selected":""}>En cours</option>
+        <option value="done" ${t.status==="done"?"selected":""}>Accomplie</option>
+        <option value="failed" ${t.status==="failed"?"selected":""}>Échec</option>
+      `;
+    } else {
+      // Soumis : uniquement transitions autorisées
+      // Depuis pending → progress ou failed
+      // Depuis progress → done ou failed
+      // Autres statuts : lecture seule
+      if(t.status === "pending"){
+        options = `
+          <option value="pending" selected>À faire</option>
+          <option value="progress">En cours</option>
+          <option value="failed">Échec</option>
+        `;
+      } else if(t.status === "progress"){
+        options = `
+          <option value="progress" selected>En cours</option>
+          <option value="done">Accomplie</option>
+          <option value="failed">Échec</option>
+        `;
+      } else {
+        // pool, done, failed : afficher seulement le statut actuel (pas de changement)
+        options = `<option value="${t.status}" selected>${STATUS_LABEL[t.status]}</option>`;
+      }
+    }
+
+    return `
     <div class="card" data-id="${t.id}">
       <div class="card-body">
         <div class="card-top">
@@ -287,19 +449,17 @@ function renderTasks(){
         <div class="card-title">${escapeHtml(t.description)}</div>
       </div>
       <div class="card-side">
-        <select class="status-select" data-action="set-status" data-id="${t.id}">
-          <option value="pool" ${t.status==="pool"?"selected":""}>Liste</option>
-          <option value="pending" ${t.status==="pending"?"selected":""}>À faire</option>
-          <option value="progress" ${t.status==="progress"?"selected":""}>En cours</option>
-          <option value="done" ${t.status==="done"?"selected":""}>Accomplie</option>
+        <select class="status-select" data-action="set-status" data-id="${t.id}" ${(!isDominante() && (t.status==="pool"||t.status==="done"||t.status==="failed")) ? "disabled" : ""}>
+          ${options}
         </select>
-        <div class="icon-row">
-          <button class="icon-btn" data-action="edit-task" data-id="${t.id}" title="Modifier">✎</button>
-          <button class="icon-btn danger" data-action="del-task" data-id="${t.id}" title="Supprimer">✕</button>
+        <div class="icon-row madame-only">
+          <button class="icon-btn edit-only" data-action="edit-task" data-id="${t.id}" title="Modifier">✎</button>
+          <button class="icon-btn danger delete-only" data-action="del-task" data-id="${t.id}" title="Supprimer">✕</button>
         </div>
       </div>
     </div>
-  `).join("");
+  `;
+  }).join("");
 }
 
 document.getElementById("taskFilters").addEventListener("click", e=>{
@@ -313,13 +473,14 @@ document.getElementById("taskFilters").addEventListener("click", e=>{
 
 function taskModal(task){
   const editing = !!task;
+  if(editing && !isDominante()) return; // soumis ne modifie pas
   openModal(`
     <h3>${editing ? "Modifier la tâche" : "Nouvelle tâche"}</h3>
     <div class="field"><label>Type</label><input id="f-type" value="${editing ? escapeHtml(task.type) : ""}" placeholder="Ex. Service, Ménage, Discipline..."></div>
     <div class="field"><label>Description</label><textarea id="f-desc" placeholder="Décrire précisément la tâche">${editing ? escapeHtml(task.description) : ""}</textarea></div>
     <div class="modal-actions">
       <button class="btn-mini" id="f-cancel">Annuler</button>
-      <button class="btn-mini gold" id="f-save">${editing ? "Enregistrer" : "Assigner"}</button>
+      <button class="btn-mini gold" id="f-save">${editing ? "Enregistrer" : "Ajouter"}</button>
     </div>
   `, m=>{
     m.querySelector("#f-cancel").onclick = closeModal;
@@ -332,7 +493,7 @@ function taskModal(task){
         log(`Tâche modifiée : ${description}`);
       }else{
         state.tasks.unshift({ id: uid(), type, description, status:"pool" });
-        log(`Nouvelle tâche assignée : ${description}`);
+        log(`Nouvelle tâche ajoutée : ${description}`);
       }
       save(); renderTasksWithPoints(); renderJournal(); closeModal();
     };
@@ -345,8 +506,13 @@ document.getElementById("tasksList").addEventListener("click", e=>{
   const t = e.target.closest("[data-action]");
   if(!t) return;
   const task = state.tasks.find(x => x.id === t.dataset.id);
-  if(t.dataset.action === "edit-task") taskModal(task);
+  if(!task) return;
+  if(t.dataset.action === "edit-task"){
+    if(!isDominante()) return;
+    taskModal(task);
+  }
   if(t.dataset.action === "del-task"){
+    if(!isDominante()) return;
     if(confirm("Supprimer cette tâche ?")){
       state.tasks = state.tasks.filter(x => x.id !== task.id);
       save(); renderTasksWithPoints();
@@ -356,8 +522,26 @@ document.getElementById("tasksList").addEventListener("click", e=>{
 document.getElementById("tasksList").addEventListener("change", e=>{
   if(e.target.dataset.action === "set-status"){
     const task = state.tasks.find(x => x.id === e.target.dataset.id);
-    task.status = e.target.value;
+    if(!task) return;
+    const newStatus = e.target.value;
+
+    // Contrôle des transitions pour le soumis
+    if(isSoumis()){
+      const allowed = {
+        pending: ["progress", "failed"],
+        progress: ["done", "failed"]
+      };
+      if(!allowed[task.status] || !allowed[task.status].includes(newStatus)){
+        showToast("Action non autorisée");
+        renderTasksWithPoints();
+        return;
+      }
+    }
+
+    task.status = newStatus;
     if(task.status === "done") log(`Tâche accomplie : ${task.description}`);
+    if(task.status === "failed") log(`Tâche en échec : ${task.description}`);
+    if(task.status === "progress") log(`Tâche en cours : ${task.description}`);
     save(); renderTasksWithPoints(); renderJournal();
   }
 });
@@ -379,10 +563,10 @@ function renderPunishments(){
         ${p.description ? `<div class="card-desc">${escapeHtml(p.description)}</div>` : ""}
       </div>
       <div class="card-side">
-        <button class="btn-mini primary" data-action="assign-pun" data-id="${p.id}">Assigner</button>
-        <div class="icon-row">
-          <button class="icon-btn" data-action="edit-pun" data-id="${p.id}" title="Modifier">✎</button>
-          <button class="icon-btn danger" data-action="del-pun" data-id="${p.id}" title="Supprimer">✕</button>
+        <button class="btn-mini primary madame-only" data-action="assign-pun" data-id="${p.id}">Assigner</button>
+        <div class="icon-row madame-only">
+          <button class="icon-btn edit-only" data-action="edit-pun" data-id="${p.id}" title="Modifier">✎</button>
+          <button class="icon-btn danger delete-only" data-action="del-pun" data-id="${p.id}" title="Supprimer">✕</button>
         </div>
       </div>
     </div>
@@ -391,6 +575,7 @@ function renderPunishments(){
 
 function punishmentModal(p){
   const editing = !!p;
+  if(editing && !isDominante()) return;
   openModal(`
     <h3>${editing ? "Modifier la punition" : "Nouvelle punition"}</h3>
     <div class="field"><label>Titre</label><input id="f-title" value="${editing ? escapeHtml(p.title) : ""}" placeholder="Ex. Temps d'agenouillement"></div>
@@ -414,8 +599,11 @@ function punishmentModal(p){
       const severity = m.querySelector("#f-sev").value;
       if(!title) return;
       if(editing){ p.title=title; p.description=description; p.severity=severity; }
-      else{ state.punishments.unshift({ id: uid(), title, description, severity }); }
-      save(); renderPunishments(); closeModal();
+      else{
+        state.punishments.unshift({ id: uid(), title, description, severity });
+        log(`Nouvelle punition ajoutée : ${title}`);
+      }
+      save(); renderPunishments(); renderJournal(); closeModal();
     };
   });
 }
@@ -426,14 +614,20 @@ document.getElementById("punishmentsList").addEventListener("click", e=>{
   const t = e.target.closest("[data-action]");
   if(!t) return;
   const p = state.punishments.find(x => x.id === t.dataset.id);
-  if(t.dataset.action === "edit-pun") punishmentModal(p);
+  if(!p) return;
+  if(t.dataset.action === "edit-pun"){
+    if(!isDominante()) return;
+    punishmentModal(p);
+  }
   if(t.dataset.action === "del-pun"){
+    if(!isDominante()) return;
     if(confirm("Supprimer cette punition ?")){
       state.punishments = state.punishments.filter(x => x.id !== p.id);
       save(); renderPunishments();
     }
   }
   if(t.dataset.action === "assign-pun"){
+    if(!isDominante()) return;
     log(`Punition assignée : ${p.title}`);
     save(); renderJournal();
     showToast(`Punition assignée : ${p.title}`);
@@ -458,9 +652,9 @@ function renderShop(){
       </div>
       <div class="card-side">
         <button class="btn-mini gold" data-action="buy" data-id="${r.id}" ${state.points < r.cost ? "disabled style='opacity:.4;cursor:not-allowed'" : ""}>Échanger</button>
-        <div class="icon-row">
-          <button class="icon-btn" data-action="edit-reward" data-id="${r.id}" title="Modifier">✎</button>
-          <button class="icon-btn danger" data-action="del-reward" data-id="${r.id}" title="Supprimer">✕</button>
+        <div class="icon-row madame-only">
+          <button class="icon-btn edit-only" data-action="edit-reward" data-id="${r.id}" title="Modifier">✎</button>
+          <button class="icon-btn danger delete-only" data-action="del-reward" data-id="${r.id}" title="Supprimer">✕</button>
         </div>
       </div>
     </div>
@@ -469,6 +663,7 @@ function renderShop(){
 
 function rewardModal(r){
   const editing = !!r;
+  if(editing && !isDominante()) return;
   openModal(`
     <h3>${editing ? "Modifier la récompense" : "Nouvelle récompense"}</h3>
     <div class="field"><label>Titre</label><input id="f-title" value="${editing ? escapeHtml(r.title) : ""}" placeholder="Ex. Massage de 20 minutes"></div>
@@ -486,8 +681,11 @@ function rewardModal(r){
       const cost = Math.max(1, parseInt(m.querySelector("#f-cost").value) || 1);
       if(!title) return;
       if(editing){ r.title=title; r.description=description; r.cost=cost; }
-      else{ state.rewards.unshift({ id: uid(), title, description, cost }); }
-      save(); renderShop(); closeModal();
+      else{
+        state.rewards.unshift({ id: uid(), title, description, cost });
+        log(`Nouvelle récompense ajoutée : ${title}`);
+      }
+      save(); renderShop(); renderJournal(); closeModal();
     };
   });
 }
@@ -498,8 +696,13 @@ document.getElementById("shopList").addEventListener("click", e=>{
   const t = e.target.closest("[data-action]");
   if(!t) return;
   const r = state.rewards.find(x => x.id === t.dataset.id);
-  if(t.dataset.action === "edit-reward") rewardModal(r);
+  if(!r) return;
+  if(t.dataset.action === "edit-reward"){
+    if(!isDominante()) return;
+    rewardModal(r);
+  }
   if(t.dataset.action === "del-reward"){
+    if(!isDominante()) return;
     if(confirm("Supprimer cette récompense ?")){
       state.rewards = state.rewards.filter(x => x.id !== r.id);
       save(); renderShop();
@@ -523,19 +726,18 @@ function renderPoints(){
 
 const POINT_STEPS = [5,10,15,50];
 function buildPointBar(taskId){
-  return `<div class="point-buttons">
+  return `<div class="point-buttons madame-only">
     ${POINT_STEPS.map(s=>`<button class="point-btn" data-action="add-points" data-amount="${s}" data-task="${taskId||""}">+${s}&#9829;</button>`).join("")}
     <button class="point-btn minus" data-action="add-points" data-amount="-5" data-task="${taskId||""}">-5&#9829;</button>
   </div>`;
 }
 
-/* injecte une mini-barre de points sur chaque tâche accomplie */
 function renderTasksWithPoints(){
   renderTasks();
   document.querySelectorAll("#tasksList .card").forEach(card=>{
     const id = card.dataset.id;
     const task = state.tasks.find(t=>t.id===id);
-    if(task.status === "done" && isDominante()){
+    if(task && task.status === "done" && isDominante()){
       const side = card.querySelector(".card-side");
       const bar = document.createElement("div");
       bar.innerHTML = buildPointBar(id);
@@ -547,6 +749,7 @@ function renderTasksWithPoints(){
 document.body.addEventListener("click", e=>{
   const t = e.target.closest('[data-action="add-points"]');
   if(!t) return;
+  if(!isDominante()) return;
   const amount = parseInt(t.dataset.amount);
   state.points = Math.max(0, state.points + amount);
   const task = state.tasks.find(x=>x.id===t.dataset.task);
@@ -570,10 +773,42 @@ function renderJournal(){
 }
 
 document.getElementById("clearJournalBtn").addEventListener("click", ()=>{
+  if(!isDominante()) return;
   if(confirm("Vider tout le journal ?")){
     state.journal = []; save(); renderJournal();
   }
 });
+
+/* =========================================================
+   CHANGEMENT MOT DE PASSE MADAME (uniquement en mode Madame)
+   ========================================================= */
+function openChangePasswordModal(){
+  if(!isDominante()) return;
+  openModal(`
+    <h3>Changer le mot de passe Madame</h3>
+    <div class="field"><label>Mot de passe actuel</label><input id="f-old" type="password" autofocus></div>
+    <div class="field"><label>Nouveau mot de passe</label><input id="f-new" type="password"></div>
+    <div class="field"><label>Confirmer</label><input id="f-new2" type="password"></div>
+    <div class="modal-actions">
+      <button class="btn-mini" id="f-cancel">Annuler</button>
+      <button class="btn-mini gold" id="f-save">Changer</button>
+    </div>
+  `, m=>{
+    m.querySelector("#f-cancel").onclick = closeModal;
+    m.querySelector("#f-save").onclick = async ()=>{
+      const old = m.querySelector("#f-old").value;
+      const n1 = m.querySelector("#f-new").value;
+      const n2 = m.querySelector("#f-new2").value;
+      if(!(await verifyPassword(old))){ showToast("Mot de passe actuel incorrect"); return; }
+      if(!n1 || n1.length < 4){ showToast("Minimum 4 caractères"); return; }
+      if(n1 !== n2){ showToast("Les nouveaux mots de passe ne correspondent pas"); return; }
+      state.madamePasswordHash = await hashPassword(n1);
+      save();
+      closeModal();
+      showToast("Mot de passe Madame mis à jour");
+    };
+  });
+}
 
 /* =========================================================
    SYNCHRONISATION EN DIRECT + EXPORT/IMPORT DE SECOURS
@@ -590,23 +825,24 @@ if(window.Sync){
 
   Sync.onRemote(remoteData=>{
     if(remoteData === null){
-      // rien côté serveur : on pousse l'état local pour initialiser le salon
       Sync.push(state);
       return;
     }
+    // conserver le rôle local (chaque appareil a son propre rôle)
+    const localRole = state.role;
     state = Object.assign(structuredClone(SEED), remoteData);
+    state.role = localRole; // le rôle reste local
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     renderAll();
   });
 
-  // reconnexion automatique si un code de salon est déjà enregistré
   const savedCode = Sync.getRoomCode();
   if(Sync.isConfigured() && savedCode){
     Sync.connect(savedCode);
   }
 }
 
-document.getElementById("syncBtn").addEventListener("click", ()=>{
+function openSyncModal(){
   const configured = window.Sync && Sync.isConfigured();
   const currentCode = window.Sync ? Sync.getRoomCode() : "";
   const isConnected = window.Sync && Sync.isReady();
@@ -641,6 +877,11 @@ document.getElementById("syncBtn").addEventListener("click", ()=>{
         <button class="btn-mini gold" id="f-connect">Se connecter</button>
       </div>
     `}
+
+    ${isDominante() ? `
+      <hr style="border:none; border-top:1px solid var(--line); margin:20px 0;">
+      <button class="btn-mini" id="f-change-pwd" style="width:100%;margin-bottom:12px;">Changer le mot de passe Madame</button>
+    ` : ""}
 
     <hr style="border:none; border-top:1px solid var(--line); margin:20px 0;">
 
@@ -680,6 +921,11 @@ document.getElementById("syncBtn").addEventListener("click", ()=>{
       };
     }
 
+    const changePwdBtn = m.querySelector("#f-change-pwd");
+    if(changePwdBtn){
+      changePwdBtn.onclick = ()=>{ closeModal(); openChangePasswordModal(); };
+    }
+
     m.querySelector("#f-copy").onclick = async ()=>{
       try{
         await navigator.clipboard.writeText(m.querySelector("#f-export").value);
@@ -694,7 +940,9 @@ document.getElementById("syncBtn").addEventListener("click", ()=>{
       if(!raw) return;
       try{
         const parsed = JSON.parse(raw);
+        const localRole = state.role;
         state = Object.assign(structuredClone(SEED), parsed);
+        state.role = localRole;
         save(); renderAll(); closeModal();
         showToast("Données importées");
       }catch{
@@ -702,12 +950,17 @@ document.getElementById("syncBtn").addEventListener("click", ()=>{
       }
     };
   });
-});
+}
+
+document.getElementById("syncBtn").addEventListener("click", openSyncModal);
+const syncBtnMobile = document.getElementById("syncBtnMobile");
+if(syncBtnMobile) syncBtnMobile.addEventListener("click", openSyncModal);
 
 /* =========================================================
    INIT
    ========================================================= */
 function renderAll(){
+  applyRoleClass();
   renderWardrobe();
   renderTasksWithPoints();
   renderPunishments();
@@ -717,6 +970,15 @@ function renderAll(){
   document.querySelectorAll(".role-btn").forEach(b=>{
     b.classList.toggle("active", b.dataset.role === state.role);
   });
+  // Afficher les boutons d'ajout aussi pour le soumis
+  // (les boutons + sont visibles pour les deux rôles, sauf ceux explicitement madame-only)
+  // On retire la classe madame-only des boutons d'ajout pour qu'ils soient disponibles au soumis
 }
+
+// Rendre les boutons d'ajout visibles pour le soumis aussi
+["addCategoryBtn","addTaskBtn","addPunishmentBtn","addRewardBtn"].forEach(id=>{
+  const btn = document.getElementById(id);
+  if(btn) btn.classList.remove("madame-only");
+});
 
 renderAll();
