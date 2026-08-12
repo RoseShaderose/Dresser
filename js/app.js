@@ -126,6 +126,29 @@ function applyRoleClass(){
   document.body.classList.toggle("role-maitresse", isDominante());
 }
 
+async function envoyerNotification(titre, message) {
+  try {
+    const response = await fetch("https://onesignal.com/api/v1/notifications", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Basic os_v2_app_m7ybcw4l7ja6ppcdqk6cry5mlrr3kgruexru3vfqhyxu2rkixj4cn27i36xlcjoivqn4ewolniou7h6zv32j5s2kp4dgezm7e6oamry"
+      },
+      body: JSON.stringify({
+        app_id: "67f0115b-8bfa-41e7-bc43-82bc28e3ac5c",
+        include_player_ids: ["5cad1cd6-d3e2-445a-a3bd-9f322fc56dfa"],
+        headings: { "en": titre, "fr": titre },
+        contents: { "en": message, "fr": message }
+      })
+    });
+
+    const data = await response.json();
+    console.log("Notification envoyée :", data);
+  } catch (error) {
+    console.error("Erreur envoi notification :", error);
+  }
+}
+
 /* =========================================================
    NAVIGATION
    ========================================================= */
@@ -296,21 +319,25 @@ document.getElementById("categoriesList").addEventListener("click", e=>{
   const cat = state.categories.find(c => c.id === t.dataset.cat);
   if(!cat) return;
 
-  if(action === "toggle-item"){
-    const item = cat.items.find(i => i.id === t.dataset.item);
-    if(!item) return;
-    if(isDominante()){
-      item.selected = !item.selected;
-      if(item.selected) log(`Madame a choisi : ${cat.name} — ${item.name}`);
-      else log(`Madame a retiré son choix : ${cat.name} — ${item.name}`);
-    }else{
-      // soumis : uniquement le statut "porté"
-      item.worn = !item.worn;
-      if(item.worn) log(`Le soumis porte : ${cat.name} — ${item.name}`);
-      else log(`Le soumis ne porte plus : ${cat.name} — ${item.name}`);
+ if(action === "toggle-item"){
+  const item = cat.items.find(i => i.id === t.dataset.item);
+  if(!item) return;
+  if(isDominante()){
+    item.selected = !item.selected;
+    if(item.selected) {
+      log(`Madame a choisi : ${cat.name} — ${item.name}`);
+      envoyerNotification("Nouvel ordre de Madame", `Tu dois porter : ${item.name}`);
+    } else {
+      log(`Madame a retiré son choix : ${cat.name} — ${item.name}`);
     }
-    save();
-    renderWardrobe(); renderJournal();
+  }else{
+    // soumis : uniquement le statut "porté"
+    item.worn = !item.worn;
+    if(item.worn) log(`Le soumis porte : ${cat.name} — ${item.name}`);
+    else log(`Le soumis ne porte plus : ${cat.name} — ${item.name}`);
+  }
+  save();
+  renderWardrobe(); renderJournal();
   }
   if(action === "del-item"){
     if(!isDominante()) return;
