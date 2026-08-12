@@ -16,29 +16,13 @@
       appId: "67f0115b-8bfa-41e7-bc43-82bc28e3ac5c",
       notifyButton: {
         enable: true
-      },
-      promptOptions: {
-        slidedown: {
-          prompts: [
-            {
-              type: "push",
-              autoPrompt: true,
-              text: {
-                actionMessage: "Veux-tu recevoir les ordres de Madame ?",
-                acceptButton: "Oui",
-                cancelButton: "Non"
-              },
-              delay: {
-                pageViews: 1,
-                timeDelay: 1
-              }
-            }
-          ]
-        }
       }
     });
+
+    // Force l'affichage du prompt
+    await OneSignal.Slidedown.promptPush();
   });
-</script> 
+</script>
 </head>
 <body>
 
